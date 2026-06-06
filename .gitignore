@@ -1,0 +1,27 @@
+# Node
+node_modules/
+*.log
+npm-debug.log*
+
+# Wrangler / Cloudflare
+.wrangler/
+.dev.vars
+.dev.vars.*
+wrangler.toml.bak
+
+# Env
+.env
+.env.local
+
+# Build output
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/
+*.swp

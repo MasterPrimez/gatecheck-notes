@@ -1,0 +1,49 @@
+# Notes Worker — runs at notes.gatecheck.net
+#
+# A MindChuk-style sticky-note board. Reads the session cookie set by
+# auth.gatecheck.net (Domain=.gatecheck.net), looks up the session in the
+# SHARED gatecheck-auth D1 (also referenced here), and scopes all reads/writes
+# to that user's data.
+#
+# After cloning, the user must:
+#   1. Push to GitHub: github.com/MasterPrimez/gatecheck-notes
+#   2. In Cloudflare dashboard, connect the repo to Workers Builds
+#      (Workers & Pages → Create → Connect to Git)
+#      Build command: npm install
+#      Deploy command: npx wrangler deploy
+#   3. After first deploy, attach bindings via dashboard:
+#        D1: binding name `DB` → database `gatecheck-auth`
+#        R2: binding name `FILES` → bucket `gatecheck-files`
+#   4. Add custom domain `notes.gatecheck.net` to the Worker
+#   5. Apply the schema once:  npm run db:migrate:remote
+#      (idempotent — it only adds the notes_* tables to the shared DB)
+
+name = "gatecheck-notes"
+main = "src/index.ts"
+compatibility_date = "2024-09-25"
+compatibility_flags = ["nodejs_compat"]
+
+# Custom domain — uncomment after DNS for notes.gatecheck.net is set up
+# routes = [
+#   { pattern = "notes.gatecheck.net", custom_domain = true }
+# ]
+
+# ─── D1: shared with the auth Worker (SAME database_id) ──────────────────────
+[[d1_databases]]
+binding = "DB"
+database_name = "gatecheck-auth"
+database_id = "a6775b3a-17a0-4e37-ade4-f6294fa9a5c4"
+
+# ─── R2: shared file bucket for the whole gatecheck account ─────────────────
+# Reserved for future image uploads; not used by v1.
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "gatecheck-files"
+
+[vars]
+# The auth Worker — used for logout + OAuth redirect URL building
+AUTH_BASE = "https://auth.gatecheck.net"
+# Public URL of this Worker (for absolute links / login redirect-back)
+SELF_BASE = "https://notes.gatecheck.net"
+# Where unauthenticated users get bounced
+LOGIN_URL = "https://gatecheck.net/login"
