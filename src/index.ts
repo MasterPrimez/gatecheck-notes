@@ -1,11 +1,13 @@
 /**
  * Notes Worker — entry point.  Runs at notes.gatecheck.net.
  *
- * Page (HTML, requires auth — redirect to gatecheck.net/login if not signed in):
+ * Pages (HTML, requires auth — redirect to gatecheck.net/login if not signed in):
  *   GET  /                         — the sticky-note board
+ *   GET  /worldcup                 — the live World Cup 2026 dashboard
  *
  * APIs (JSON, require auth — return 401 if not signed in):
  *   GET    /api/health
+ *   GET    /api/worldcup           — World Cup schedule + live scores + standings
  *   GET    /api/notes              — list the user's notes (with tag ids)
  *   POST   /api/notes              — create a note / todo
  *   GET    /api/notes/:id          — get one
@@ -20,10 +22,12 @@
 import { Hono } from "hono";
 import type { AppEnv } from "./types";
 import indexPage from "./pages/index";
+import worldcupPage from "./pages/worldcup";
 import notesApi from "./routes/notes";
 import tagsApi from "./routes/tags";
 import previewApi from "./routes/preview";
 import uploadsApi from "./routes/uploads";
+import worldcupApi from "./routes/worldcup";
 
 const app = new Hono<AppEnv>();
 
@@ -37,8 +41,10 @@ app.route("/api/notes", notesApi);
 app.route("/api/tags", tagsApi);
 app.route("/api/preview", previewApi);
 app.route("/api/uploads", uploadsApi);
+app.route("/api/worldcup", worldcupApi);
 
-// HTML page
+// HTML pages
+app.route("/worldcup", worldcupPage);
 app.route("/", indexPage);
 
 app.notFound((c) => {

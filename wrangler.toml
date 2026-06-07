@@ -47,3 +47,13 @@ AUTH_BASE = "https://auth.gatecheck.net"
 SELF_BASE = "https://notes.gatecheck.net"
 # Where unauthenticated users get bounced
 LOGIN_URL = "https://gatecheck.net/login"
+
+# ─── World Cup 2026 live dashboard (/worldcup) ──────────────────────────────
+# Optional. The dashboard ships with the full built-in 2026 schedule and derives
+# match status (upcoming / LIVE+minute / full-time) from the real clock, so it
+# works with no config. To overlay REAL live scores, point this at a JSON feed
+# that returns { "events": [...] } (TheSportsDB-style) or { "matches": [...] };
+# the Worker fetches it server-side and merges scores onto the schedule.
+#   WORLDCUP_API_URL = "https://example.com/worldcup-livescores.json"
+# Force score-simulation mode (otherwise enable per-request with ?demo=1):
+#   WORLDCUP_DEMO = "1"

@@ -30,6 +30,32 @@ already signed in if you're signed in anywhere on `*.gatecheck.net`.
   oldest first. Pinned notes always float to the top. Notes can be marked
   **Done** (dimmed + struck through).
 
+## World Cup 2026 — live dashboard
+
+A second page, **`/worldcup`** (⚽ icon in the Notes nav), is an interactive
+**live dashboard for the FIFA World Cup 2026** (USA · Canada · Mexico).
+
+- **All games, grouped by day** (in *your* local timezone) — flags, kickoff
+  time, group + matchday, the stadium/city, and **where to watch** (FOX / FS1,
+  Telemundo / Universo, FOX One stream, and the free Tubi 4K simulcasts).
+- **Realtime** — the page polls every 15 s and a 1-second ticker keeps
+  countdowns and live minutes moving. Each match flips **Upcoming → ● LIVE _67'_
+  → Full-time** automatically off the real clock, and **scores / wins / losses**
+  update live. The leading/winning side is highlighted.
+- **Standings** — all 12 groups (A–L) with W-D-L, GF:GA, GD and points,
+  recomputed from results as matches go final; top-2 / best-third zones marked.
+- **Venues & TV** — the 16 host stadiums and the US broadcast lineup.
+- **Filters** — All / Today / ● Live now / Upcoming / Finished, plus a group
+  picker and a team/city search.
+
+The full 2026 group-stage fixture list is **built in** (matchups from the
+confirmed Final Draw; the announced 11–14 June kickoffs are exact, later
+matchdays are flagged *provisional*), so the board works with zero config. To
+overlay **real live scores**, set `WORLDCUP_API_URL` to a JSON live-scores feed
+(TheSportsDB `{events:[…]}` or generic `{matches:[…]}` shape) — the Worker
+fetches and normalizes it server-side. `?demo=1` (or `WORLDCUP_DEMO=1`)
+synthesises live scores so you can watch the realtime behaviour before kickoff.
+
 ## Architecture (same pattern as the other GateCheck tools)
 
 ```
@@ -55,6 +81,11 @@ notes.gatecheck.net   ← this Worker (gatecheck-notes)
 ```
 src/index.ts            Hono router + notFound/onError
 src/types.ts            Env, User, Note/Tag DTOs
+src/lib/worldcup.ts     World Cup data (teams/groups/venues/TV/fixtures) + live
+                        feed normalize + status/standings builder
+src/routes/worldcup.ts  /api/worldcup  (schedule + live scores + standings)
+src/pages/worldcup.ts   GET /worldcup  (dashboard shell + styles)
+src/pages/worldcup.client.ts  the browser dashboard app (polls every 15s)
 src/db/schema.sql       notes_notes, notes_tags, notes_note_tags, notes_link_cache
 src/lib/auth.ts         session cookie → user (shared D1 lookup)
 src/lib/ids.ts          uuid + sha256
@@ -115,6 +146,7 @@ All `/api/*` routes require the session cookie (401 JSON otherwise).
 | Method | Path | Body / notes |
 |---|---|---|
 | GET | `/api/health` | no auth; service ping |
+| GET | `/api/worldcup` | World Cup dashboard JSON (matches, live status, standings); `?demo=1` simulates live scores |
 | GET | `/api/notes` | list notes (with `tag_ids`) |
 | POST | `/api/notes` | `{ kind:'note'\|'todo', content, items?, tag_ids?, pinned?, done? }` |
 | GET | `/api/notes/:id` | one note |

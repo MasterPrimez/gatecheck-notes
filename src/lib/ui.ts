@@ -370,6 +370,7 @@ export function layout(opts: { title: string; user: User; body: string; inlineSc
     <div class="gc-nav-inner">
       <a class="gc-logo" href="/">Notes</a>
       <div class="gc-nav-right nav-menu-anchor">
+        <a class="icon-btn" href="/worldcup" title="World Cup 2026 live dashboard" aria-label="World Cup 2026 live dashboard" style="text-decoration:none">⚽</a>
         <span class="hint" style="margin-right:8px" title="${escapeHtml(greeting)}">${escapeHtml(greeting)}</span>
         <button class="icon-btn" id="view-menu-btn" title="View options" aria-label="View options">⋯</button>
         <button class="icon-btn" id="signout-btn" title="Sign out" aria-label="Sign out">⏻</button>

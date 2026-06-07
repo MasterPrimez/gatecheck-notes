@@ -8,6 +8,11 @@ export interface Env {
   AUTH_BASE: string;
   SELF_BASE: string;
   LOGIN_URL: string;
+  /** Optional live-scores feed (JSON). When set, the World Cup dashboard
+   *  overlays real scores onto the built-in schedule. See lib/worldcup.ts. */
+  WORLDCUP_API_URL?: string;
+  /** Set to "1" to force the World Cup dashboard into score-simulation mode. */
+  WORLDCUP_DEMO?: string;
 }
 
 /** Subset of the users table we care about here */
