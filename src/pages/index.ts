@@ -37,23 +37,30 @@ app.get("/", async (c) => {
           <button class="seg" id="seg-todo" type="button">☑ To-Do List</button>
         </div>
         <div class="composer-body" id="composer-body"></div>
+        <div class="composer-images" id="composer-images"></div>
         <div class="composer-tagrow" id="composer-tagrow"></div>
         <div class="composer-foot">
-          <span class="hint">⌘↵ to save · Esc to close</span>
+          <div class="foot-left">
+            <button class="icon-pill" id="composer-image-btn" type="button" title="Add image">🖼 Image</button>
+            <span class="hint">drag &amp; drop or paste images · ⌘↵ to save</span>
+          </div>
           <div class="foot-actions">
             <button class="btn-link" id="composer-close" type="button">✕ Close</button>
             <button class="btn btn-primary" id="composer-save" type="button">Save</button>
           </div>
         </div>
       </div>
+      <input type="file" id="composer-file-input" accept="image/*" multiple style="display:none" />
     </div>
+
+    <div class="drop-overlay" id="drop-overlay"><div class="drop-overlay-inner">Drop images to add to a note</div></div>
 
     <div class="board" id="board"><div class="loading-board">Loading your notes…</div></div>
 
     <div class="modal-backdrop" id="tag-modal">
       <div class="modal">
         <h2>Edit tags</h2>
-        <p class="sub">Renaming a tag updates it on every note. Deleting removes it from notes but keeps the notes.</p>
+        <p class="sub">Rename, reorder with ↑/↓, nest sub-tags, or delete. The number shows how many notes use each tag. Renaming updates a tag everywhere; deleting removes it from notes but keeps the notes.</p>
         <div id="tag-edit-list"></div>
         <div class="new-tag-row">
           <input id="new-tag-input" placeholder="New tag name (e.g. MINDCHUK)" maxlength="40" autocomplete="off" />

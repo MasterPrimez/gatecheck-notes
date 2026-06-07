@@ -25,30 +25,50 @@ export interface TodoItem {
   done: boolean;
 }
 
-/** Row shape in notes_notes. `items` is the raw JSON string in the DB. */
+/** An image attached to a note (dragged/dropped/pasted, stored in R2). */
+export interface NoteImage {
+  id: string;
+  url: string; // /api/uploads/:id  (the client just uses this as <img src>)
+  name: string;
+}
+
+/** Row shape in notes_notes. `items`/`images` are raw JSON strings in the DB. */
 export interface NoteRow {
   id: string;
   owner_id: string;
   kind: NoteKind;
   content: string;
   items: string | null;
+  images: string | null;
   pinned: number; // 0/1
   done: number; // 0/1
   created_at: number;
   updated_at: number;
 }
 
-/** A note as sent to the client — `items` parsed, tag ids attached. */
+/** A note as sent to the client — `items`/`images` parsed, tag ids attached. */
 export interface NoteDTO {
   id: string;
   kind: NoteKind;
   content: string;
   items: TodoItem[] | null;
+  images: NoteImage[];
   pinned: boolean;
   done: boolean;
   created_at: number;
   updated_at: number;
   tag_ids: string[];
+}
+
+/** Row shape in notes_uploads. */
+export interface UploadRow {
+  id: string;
+  owner_id: string;
+  r2_key: string;
+  content_type: string;
+  name: string | null;
+  size_bytes: number;
+  created_at: number;
 }
 
 export interface TagRow {

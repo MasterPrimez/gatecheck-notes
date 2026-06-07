@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS notes_notes (
   kind        TEXT NOT NULL DEFAULT 'note',                      -- 'note' | 'todo'
   content     TEXT NOT NULL DEFAULT '',                          -- note body, or todo title
   items       TEXT,                                              -- JSON array of {text,done} for todos; NULL for notes
+  images      TEXT,                                              -- JSON array of {id,url,name} for dropped/uploaded images; NULL if none
   pinned      INTEGER NOT NULL DEFAULT 0,                        -- 0/1
   done        INTEGER NOT NULL DEFAULT 0,                        -- 0/1 (the strike-through "DONE" state)
   created_at  INTEGER NOT NULL,                                  -- unix epoch seconds — drives the "May 15 · 9:24 AM" stamp
@@ -56,6 +57,25 @@ CREATE TABLE IF NOT EXISTS notes_note_tags (
 
 CREATE INDEX IF NOT EXISTS idx_note_tags_tag  ON notes_note_tags(tag_id);
 CREATE INDEX IF NOT EXISTS idx_note_tags_note ON notes_note_tags(note_id);
+
+-- ── Uploaded images ────────────────────────────────────────────────────────
+-- One row per image dragged/dropped/pasted into a note. The bytes live in R2
+-- (binding FILES) at r2_key; this table maps a public id → that key and the
+-- owner, so the serve endpoint can re-check ownership on every read. A note
+-- references images by id in its `images` JSON column. When a note is deleted
+-- we delete the matching R2 objects + rows; ON DELETE CASCADE from users covers
+-- account deletion (R2 objects are best-effort cleaned by the app).
+CREATE TABLE IF NOT EXISTS notes_uploads (
+  id            TEXT PRIMARY KEY,                                -- crypto.randomUUID(); used in /api/uploads/:id
+  owner_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  r2_key        TEXT NOT NULL,                                   -- users/{ownerId}/notes/{id}.{ext}
+  content_type  TEXT NOT NULL,
+  name          TEXT,                                            -- original filename (for alt text)
+  size_bytes    INTEGER NOT NULL DEFAULT 0,
+  created_at    INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_uploads_owner ON notes_uploads(owner_id);
 
 -- ── Link-preview cache ─────────────────────────────────────────────────────
 -- OpenGraph metadata scraped server-side for generic URLs, cached so we don't

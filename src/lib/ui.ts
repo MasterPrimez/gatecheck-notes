@@ -158,6 +158,50 @@ const STYLES = `
   }
   .hint { color: var(--text-muted); font-size: 12px; }
   .foot-actions { display: flex; gap: 12px; align-items: center; }
+  .foot-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .icon-pill {
+    display: inline-flex; align-items: center; gap: 6px; flex: none;
+    padding: 7px 12px; border-radius: 8px; font-size: 12px;
+    background: transparent; border: 1px solid var(--border-faint); color: var(--text-dim);
+  }
+  .icon-pill:hover { color: var(--text); border-color: var(--border-soft); background: rgba(255,255,255,0.03); }
+
+  /* composer image thumbnails */
+  .composer-images { display: flex; flex-wrap: wrap; gap: 10px; padding: 0 16px; }
+  .composer-images:empty { padding: 0; }
+  .composer-images .thumb {
+    position: relative; width: 92px; height: 92px; border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--border-faint); background: #000;
+  }
+  .composer-images .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .composer-images .thumb .rm {
+    position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(0,0,0,0.7); color: #fff; border: none; font-size: 11px; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .composer-images .thumb .rm:hover { background: var(--danger); }
+  .composer-images .thumb.uploading { display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 10px; }
+
+  /* composer drag-over highlight */
+  .composer.dragging { border-color: var(--green); box-shadow: 0 0 0 2px var(--green-glow); }
+
+  /* full-window drop overlay */
+  .drop-overlay {
+    position: fixed; inset: 0; z-index: 70; display: none;
+    background: rgba(5,5,5,0.82); backdrop-filter: blur(3px);
+    align-items: center; justify-content: center; padding: 40px;
+  }
+  .drop-overlay.show { display: flex; }
+  .drop-overlay-inner {
+    border: 2px dashed var(--green-border); border-radius: 18px; color: var(--green);
+    padding: 60px 80px; font-size: 18px; letter-spacing: 0.04em; text-align: center;
+    background: rgba(95,214,132,0.04);
+  }
+
+  /* uploaded images on a card */
+  .note-images { display: grid; gap: 6px; margin-top: 12px; }
+  .note-images img { width: 100%; border-radius: 8px; display: block; border: 1px solid var(--border-faint); object-fit: cover; }
+  .note-images.multi img { aspect-ratio: 1 / 1; }
 
   .btn {
     padding: 9px 18px; border-radius: 8px; font-size: 12px; letter-spacing: 0.04em;
@@ -270,7 +314,16 @@ const STYLES = `
   .tag-edit-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border-faint); }
   .tag-edit-row input { flex: 1; background: var(--bg-input); border: 1px solid var(--border-faint); border-radius: 7px; color: var(--text); font-family: var(--mono); font-size: 13px; padding: 8px 10px; }
   .tag-edit-row input:focus { outline: none; border-color: var(--border-soft); }
-  .tag-edit-row .grip { color: var(--text-muted); font-size: 12px; }
+  .tag-edit-row .grip { color: var(--text-muted); font-size: 12px; width: 12px; text-align: center; }
+  #tag-edit-list { max-height: 46vh; overflow-y: auto; margin: 4px -4px; padding: 0 4px; }
+  .reorder { display: flex; flex-direction: column; flex: none; }
+  .reorder button { width: 18px; height: 12px; line-height: 1; font-size: 8px; padding: 0; color: var(--text-muted); background: none; border: none; }
+  .reorder button:hover { color: var(--text); }
+  .reorder button:disabled { opacity: 0.22; cursor: default; }
+  .tag-count { flex: none; color: var(--text-muted); font-size: 10px; background: rgba(255,255,255,0.05); border-radius: 999px; padding: 2px 8px; min-width: 24px; text-align: center; }
+  .subadd-row { display: flex; gap: 8px; padding: 2px 0 8px 30px; }
+  .subadd-row input { flex: 1; background: var(--bg-input); border: 1px solid var(--border-faint); border-radius: 7px; color: var(--text); font-family: var(--mono); font-size: 12px; padding: 8px 10px; }
+  .subadd-row input:focus { outline: none; border-color: var(--green-border); }
   .new-tag-row { display: flex; gap: 8px; margin-top: 16px; }
   .new-tag-row input { flex: 1; background: var(--bg-input); border: 1px solid var(--border-faint); border-radius: 7px; color: var(--text); font-family: var(--mono); font-size: 13px; padding: 10px 12px; }
   .new-tag-row input:focus { outline: none; border-color: var(--border-soft); }

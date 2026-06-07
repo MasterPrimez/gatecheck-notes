@@ -23,6 +23,7 @@ import indexPage from "./pages/index";
 import notesApi from "./routes/notes";
 import tagsApi from "./routes/tags";
 import previewApi from "./routes/preview";
+import uploadsApi from "./routes/uploads";
 
 const app = new Hono<AppEnv>();
 
@@ -35,6 +36,7 @@ app.get("/api/health", (c) =>
 app.route("/api/notes", notesApi);
 app.route("/api/tags", tagsApi);
 app.route("/api/preview", previewApi);
+app.route("/api/uploads", uploadsApi);
 
 // HTML page
 app.route("/", indexPage);

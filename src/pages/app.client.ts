@@ -62,7 +62,7 @@ export const APP_JS = `
     notes: [], tags: [],
     tagById: {}, childMap: {}, topTags: [],
     filter: null, search: '',
-    composer: { kind:'note', content:'', items:[{text:'',done:false}], tagIds:{}, editingId:null },
+    composer: { kind:'note', content:'', items:[{text:'',done:false}], images:[], uploading:0, tagIds:{}, editingId:null },
     view: loadView()
   };
 
@@ -302,13 +302,21 @@ export const APP_JS = `
     }
     card.appendChild(body);
 
-    // media previews
+    // uploaded / dropped images
+    if(note.images && note.images.length){
+      var ig = el('div', { class:'note-images' + (note.images.length > 1 ? ' multi' : '') });
+      if(note.images.length > 1) ig.style.gridTemplateColumns = '1fr 1fr';
+      note.images.forEach(function(im){ ig.appendChild(el('img', { src:im.url, alt:im.name || '', loading:'lazy' })); });
+      card.appendChild(ig);
+    }
+
+    // media previews (links pasted into the text)
     var media = buildMedia(note);
     if(media) card.appendChild(media);
 
     // click card background → edit
     card.addEventListener('click', function(e){
-      if(e.target.closest('a, button, input, label, .media, .embed, .twitter-holder, .linkcard')) return;
+      if(e.target.closest('a, button, input, label, .media, .embed, .twitter-holder, .linkcard, .note-images')) return;
       editNote(note);
     });
     return card;
@@ -409,8 +417,8 @@ export const APP_JS = `
     resetComposer();
   }
   function resetComposer(){
-    state.composer = { kind:'note', content:'', items:[{text:'',done:false}], tagIds:{}, editingId:null };
-    setSeg('note'); renderComposerBody(); renderComposerTags();
+    state.composer = { kind:'note', content:'', items:[{text:'',done:false}], images:[], uploading:0, tagIds:{}, editingId:null };
+    setSeg('note'); renderComposerBody(); renderComposerTags(); renderComposerImages();
   }
   function setSeg(kind){
     state.composer.kind = kind;
@@ -467,29 +475,64 @@ export const APP_JS = `
       wrap.appendChild(chip);
     });
   }
+  // ── composer images (drag-drop / paste / file-pick) ──────
+  function renderComposerImages(){
+    var wrap = qs('composer-images'); if(!wrap) return; wrap.textContent = '';
+    state.composer.images.forEach(function(im, idx){
+      var thumb = el('div', { class:'thumb' });
+      thumb.appendChild(el('img', { src:im.url, alt:im.name || '' }));
+      thumb.appendChild(el('button', { class:'rm', title:'Remove image', onclick: function(e){ e.stopPropagation(); state.composer.images.splice(idx,1); renderComposerImages(); } }, '✕'));
+      wrap.appendChild(thumb);
+    });
+    for(var u=0; u<(state.composer.uploading||0); u++){ wrap.appendChild(el('div', { class:'thumb uploading' }, 'Uploading…')); }
+  }
+  function ensureComposerOpen(){ if(!qs('composer').classList.contains('open')) openComposer(); }
+  function dropIntoComposer(files){ if(!qs('composer').classList.contains('open')) resetComposer(); uploadFiles(files); }
+  function hasFiles(e){ try { return !!(e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') >= 0); } catch(_){ return false; } }
+  function uploadFiles(files){
+    if(!files || !files.length) return;
+    var imgs = [];
+    for(var i=0;i<files.length;i++){ var f = files[i]; if(f && f.type && f.type.indexOf('image/') === 0) imgs.push(f); }
+    if(!imgs.length){ toast('Only images can be added'); return; }
+    ensureComposerOpen();
+    imgs.forEach(function(file){
+      if(file.size > 10 * 1024 * 1024){ toast('“' + (file.name||'image') + '” is over 10 MB'); return; }
+      state.composer.uploading = (state.composer.uploading||0) + 1; renderComposerImages();
+      var fd = new FormData(); fd.append('file', file);
+      fetch('/api/uploads', { method:'POST', credentials:'include', body: fd })
+        .then(function(res){ return res.json().catch(function(){ return {}; }).then(function(b){ if(!res.ok) throw new Error(b.error || 'Upload failed'); return b; }); })
+        .then(function(b){ state.composer.images.push({ id:b.id, url:b.url, name:b.name || '' }); })
+        .catch(function(e){ toast(e.message || 'Upload failed'); })
+        .then(function(){ state.composer.uploading = Math.max(0, (state.composer.uploading||0) - 1); renderComposerImages(); });
+    });
+  }
+
   function editNote(note){
     state.composer = {
       kind: note.kind, content: note.content || '',
       items: (note.items && note.items.length) ? note.items.map(function(it){ return { text:it.text, done:!!it.done }; }) : [{text:'',done:false}],
-      tagIds: {}, editingId: note.id
+      images: (note.images || []).map(function(im){ return { id:im.id, url:im.url, name:im.name || '' }; }),
+      uploading: 0, tagIds: {}, editingId: note.id
     };
     (note.tag_ids || []).forEach(function(tid){ state.composer.tagIds[tid] = true; });
-    setSeg(note.kind); renderComposerBody(); renderComposerTags(); openComposer();
+    setSeg(note.kind); renderComposerBody(); renderComposerTags(); renderComposerImages(); openComposer();
     window.scrollTo({ top:0, behavior:'smooth' });
     var f = qs('note-area') || qs('todo-title'); if(f) f.focus();
   }
   function saveComposer(){
     syncComposerContent();
+    if(state.composer.uploading > 0){ toast('Hang on — images still uploading'); return; }
     var kind = state.composer.kind;
     var content = (state.composer.content || '').trim();
+    var images = state.composer.images.map(function(im){ return { id:im.id, url:im.url, name:im.name || '' }; });
     var items = null;
     if(kind === 'todo'){
       items = state.composer.items.map(function(it){ return { text:(it.text||'').trim(), done:!!it.done }; }).filter(function(it){ return it.text.length > 0; });
     }
-    if(kind === 'note' && !content){ toast('Note is empty'); return; }
-    if(kind === 'todo' && !content && (!items || !items.length)){ toast('Add a title or at least one item'); return; }
+    if(kind === 'note' && !content && !images.length){ toast('Add some text or an image'); return; }
+    if(kind === 'todo' && !content && (!items || !items.length) && !images.length){ toast('Add a title, an item, or an image'); return; }
     var tagIds = Object.keys(state.composer.tagIds).filter(function(k){ return state.composer.tagIds[k]; });
-    var payload = { kind:kind, content:content, items:items, tag_ids:tagIds };
+    var payload = { kind:kind, content:content, items:items, images:images, tag_ids:tagIds };
     var editingId = state.composer.editingId;
     var req = editingId
       ? api('/api/notes/' + editingId, { method:'PUT', body: JSON.stringify(payload) })
@@ -522,31 +565,92 @@ export const APP_JS = `
     });
   }
 
+  var openSubParents = {}; // parentTagId -> bool (which inline "add sub-tag" rows are expanded)
+
   function openTagEditor(){ qs('tag-modal').classList.add('open'); renderTagEditor(); var i = qs('new-tag-input'); if(i){ i.value=''; setTimeout(function(){ i.focus(); }, 50); } }
-  function closeTagEditor(){ qs('tag-modal').classList.remove('open'); }
+  function closeTagEditor(){ qs('tag-modal').classList.remove('open'); openSubParents = {}; }
+
+  function tagUsageCount(tid){ var c = 0; state.notes.forEach(function(n){ if((n.tag_ids || []).indexOf(tid) >= 0) c++; }); return c; }
+  function bySortPos(a,b){ return (a.position - b.position) || a.name.localeCompare(b.name); }
+
   function renderTagEditor(){
     var list = qs('tag-edit-list'); list.textContent = '';
-    if(!state.tags.length){ list.appendChild(el('p', { class:'hint', style:'padding:8px 0;' }, 'No tags yet. Add your first below.')); return; }
-    state.topTags.forEach(function(t){ list.appendChild(tagEditRow(t, false)); (state.childMap[t.id] || []).forEach(function(ct){ list.appendChild(tagEditRow(ct, true)); }); });
+    if(!state.tags.length){ list.appendChild(el('p', { class:'hint', style:'padding:10px 0;' }, 'No tags yet — add your first below.')); return; }
+    var tops = state.topTags.slice().sort(bySortPos);
+    tops.forEach(function(t, ti){
+      list.appendChild(tagEditRow(t, false, tops, ti));
+      var kids = (state.childMap[t.id] || []).slice().sort(bySortPos);
+      kids.forEach(function(ct, ci){ list.appendChild(tagEditRow(ct, true, kids, ci)); });
+      if(openSubParents[t.id]){
+        var sr = el('div', { class:'subadd-row' });
+        var si = el('input', { type:'text', id:'subadd-input-' + t.id, placeholder:'New sub-tag of #' + t.name + '…', maxlength:'40' });
+        si.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); addSubTag(t.id); } if(e.key === 'Escape'){ openSubParents[t.id] = false; renderTagEditor(); } });
+        sr.appendChild(si);
+        sr.appendChild(el('button', { class:'btn btn-primary', style:'padding:7px 14px;', onclick: function(){ addSubTag(t.id); } }, 'Add'));
+        list.appendChild(sr);
+      }
+    });
   }
-  function tagEditRow(t, isChild){
-    var row = el('div', { class:'tag-edit-row', style: isChild ? 'padding-left:22px;' : '' });
+
+  function tagEditRow(t, isChild, siblings, idx){
+    var row = el('div', { class:'tag-edit-row', style: isChild ? 'padding-left:18px;' : '' });
+
+    var reorder = el('div', { class:'reorder' });
+    var up = el('button', { title:'Move up', onclick: function(){ moveTag(t, -1); } }, '▲');
+    var down = el('button', { title:'Move down', onclick: function(){ moveTag(t, 1); } }, '▼');
+    if(idx <= 0) up.disabled = true;
+    if(idx >= siblings.length - 1) down.disabled = true;
+    reorder.appendChild(up); reorder.appendChild(down);
+    row.appendChild(reorder);
+
     row.appendChild(el('span', { class:'grip' }, isChild ? '↳' : '#'));
+
     var inp = el('input', { type:'text', value: t.name, maxlength:'40' });
-    function commit(){ var name = inp.value.trim(); if(!name || name === t.name) return; api('/api/tags/' + t.id, { method:'PUT', body: JSON.stringify({ name:name }) }).then(reloadTags).catch(function(e){ toast(e.message); }); }
+    function commit(){ var name = inp.value.trim(); if(!name){ inp.value = t.name; return; } if(name === t.name) return; api('/api/tags/' + t.id, { method:'PUT', body: JSON.stringify({ name:name }) }).then(reloadTags).catch(function(e){ toast(e.message); inp.value = t.name; }); }
     inp.addEventListener('blur', commit);
     inp.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ inp.blur(); } });
     row.appendChild(inp);
+
+    var n = tagUsageCount(t.id);
+    row.appendChild(el('span', { class:'tag-count', title: n + (n === 1 ? ' note' : ' notes') }, String(n)));
+
     if(!isChild){
-      row.appendChild(el('button', { class:'act', title:'Add sub-tag', onclick: function(){
-        var name = prompt('Sub-tag of #' + t.name + ':'); if(name && name.trim()) api('/api/tags', { method:'POST', body: JSON.stringify({ name:name.trim(), parent_id:t.id }) }).then(reloadTags).catch(function(e){ toast(e.message); });
-      } }, '＋'));
+      var subOpen = !!openSubParents[t.id];
+      row.appendChild(el('button', { class:'act' + (subOpen ? ' on' : ''), title:'Add sub-tag', onclick: function(){ toggleSubAdd(t.id); } }, '＋'));
     }
     row.appendChild(el('button', { class:'act danger', title:'Delete tag', onclick: function(){
-      if(!confirm('Delete #' + t.name + '? It is removed from notes, but the notes are kept.')) return;
-      api('/api/tags/' + t.id, { method:'DELETE' }).then(function(){ if(state.filter === t.id) state.filter = null; reloadTags(); }).catch(function(e){ toast(e.message); });
+      var kidCount = (state.childMap[t.id] || []).length;
+      var warn = 'Delete #' + t.name + '?' + (kidCount ? ' Its ' + kidCount + ' sub-tag' + (kidCount === 1 ? '' : 's') + ' go too.' : '') + ' Notes are kept.';
+      if(!confirm(warn)) return;
+      api('/api/tags/' + t.id, { method:'DELETE' }).then(function(){ if(state.filter === t.id) state.filter = null; delete openSubParents[t.id]; reloadTags(); }).catch(function(e){ toast(e.message); });
     } }, '🗑'));
     return row;
+  }
+
+  function toggleSubAdd(pid){
+    openSubParents[pid] = !openSubParents[pid];
+    renderTagEditor();
+    if(openSubParents[pid]){ var i = qs('subadd-input-' + pid); if(i) i.focus(); }
+  }
+  function addSubTag(pid){
+    var i = qs('subadd-input-' + pid); if(!i) return;
+    var name = (i.value || '').trim(); if(!name) return;
+    api('/api/tags', { method:'POST', body: JSON.stringify({ name:name, parent_id:pid }) }).then(function(){
+      openSubParents[pid] = true; return reloadTags();
+    }).then(function(){ var j = qs('subadd-input-' + pid); if(j) j.focus(); }).catch(function(e){ toast(e.message); });
+  }
+  function moveTag(t, dir){
+    var sibs = (t.parent_id ? (state.childMap[t.parent_id] || []) : state.topTags).slice().sort(bySortPos);
+    var idx = -1; for(var i=0;i<sibs.length;i++){ if(sibs[i].id === t.id){ idx = i; break; } }
+    var j = idx + dir;
+    if(idx < 0 || j < 0 || j >= sibs.length) return;
+    var other = sibs[j];
+    var pa = t.position, pb = other.position;
+    if(pa === pb) pb = pa + dir; // guarantee a swap even if positions collide
+    Promise.all([
+      api('/api/tags/' + t.id, { method:'PUT', body: JSON.stringify({ position: pb }) }),
+      api('/api/tags/' + other.id, { method:'PUT', body: JSON.stringify({ position: pa }) })
+    ]).then(reloadTags).catch(function(e){ toast(e.message); });
   }
   function addTopTag(){
     var i = qs('new-tag-input'); var name = (i.value || '').trim(); if(!name) return;
@@ -591,6 +695,32 @@ export const APP_JS = `
       else if(e.key === 'Escape'){ e.preventDefault(); closeComposer(); }
     });
 
+    // images: file-pick button + hidden input
+    qs('composer-image-btn').addEventListener('click', function(){ qs('composer-file-input').click(); });
+    qs('composer-file-input').addEventListener('change', function(e){ uploadFiles(e.target.files); e.target.value = ''; });
+
+    // images: drag-and-drop onto the composer
+    var comp = qs('composer');
+    ['dragenter','dragover'].forEach(function(ev){ comp.addEventListener(ev, function(e){ if(!hasFiles(e)) return; e.preventDefault(); e.stopPropagation(); comp.classList.add('dragging'); }); });
+    comp.addEventListener('dragleave', function(e){ if(e.target === comp) comp.classList.remove('dragging'); });
+    comp.addEventListener('drop', function(e){ if(!hasFiles(e)) return; e.preventDefault(); e.stopPropagation(); comp.classList.remove('dragging'); dropIntoComposer(e.dataTransfer.files); });
+
+    // images: drag anywhere on the page → overlay → drops into a new/open note
+    var overlay = qs('drop-overlay'); var dragDepth = 0;
+    window.addEventListener('dragenter', function(e){ if(!hasFiles(e)) return; e.preventDefault(); dragDepth++; overlay.classList.add('show'); });
+    window.addEventListener('dragover', function(e){ if(!hasFiles(e)) return; e.preventDefault(); });
+    window.addEventListener('dragleave', function(){ dragDepth--; if(dragDepth <= 0){ dragDepth = 0; overlay.classList.remove('show'); } });
+    window.addEventListener('drop', function(e){ dragDepth = 0; overlay.classList.remove('show'); if(!hasFiles(e)) return; e.preventDefault(); dropIntoComposer(e.dataTransfer.files); });
+
+    // images: paste from clipboard while the composer is open
+    window.addEventListener('paste', function(e){
+      if(!qs('composer').classList.contains('open')) return;
+      var items = e.clipboardData && e.clipboardData.items; if(!items) return;
+      var files = [];
+      for(var i=0;i<items.length;i++){ if(items[i].kind === 'file'){ var f = items[i].getAsFile(); if(f && f.type && f.type.indexOf('image/') === 0) files.push(f); } }
+      if(files.length){ e.preventDefault(); uploadFiles(files); }
+    });
+
     // search
     qs('search').addEventListener('input', function(e){ state.search = e.target.value; renderBoard(); });
 
@@ -615,7 +745,7 @@ export const APP_JS = `
     });
     document.addEventListener('click', function(){ vmenu.classList.remove('open'); });
 
-    renderComposerBody(); renderComposerTags(); renderViewMenu();
+    renderComposerBody(); renderComposerTags(); renderComposerImages(); renderViewMenu();
     load();
   }
 
