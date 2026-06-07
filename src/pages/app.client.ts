@@ -319,8 +319,51 @@ export const APP_JS = `
       if(e.target.closest('a, button, input, label, .media, .embed, .twitter-holder, .linkcard, .note-images')) return;
       editNote(note);
     });
+
+    // wire all viewable images (uploaded + inline image URLs) to the lightbox
+    var lbImgs = card.querySelectorAll('.note-images img, .inline-img');
+    if(lbImgs.length){
+      var srcs = []; lbImgs.forEach(function(im){ srcs.push(im.src); });
+      lbImgs.forEach(function(im, i){
+        im.style.cursor = 'zoom-in';
+        im.addEventListener('click', function(e){ e.stopPropagation(); openLightbox(srcs, i); });
+      });
+    }
     return card;
   }
+
+  // ── lightbox (click an image to zoom; ←/→ to page, Esc to close) ─────────
+  var lb = { el:null, img:null, count:null, prev:null, next:null, srcs:[], idx:0 };
+  function ensureLightbox(){
+    if(lb.el) return;
+    var box = el('div', { class:'lightbox' });
+    var img = el('img', { alt:'' });
+    var close = el('button', { class:'lb-close', title:'Close (Esc)', onclick: function(e){ e.stopPropagation(); closeLightbox(); } }, '✕');
+    var prev = el('button', { class:'lb-nav lb-prev', title:'Previous (←)', onclick: function(e){ e.stopPropagation(); stepLightbox(-1); } }, '‹');
+    var next = el('button', { class:'lb-nav lb-next', title:'Next (→)', onclick: function(e){ e.stopPropagation(); stepLightbox(1); } }, '›');
+    var count = el('div', { class:'lb-count' });
+    box.appendChild(img); box.appendChild(close); box.appendChild(prev); box.appendChild(next); box.appendChild(count);
+    box.addEventListener('click', function(e){ if(e.target === box) closeLightbox(); });
+    document.body.appendChild(box);
+    lb.el = box; lb.img = img; lb.count = count; lb.prev = prev; lb.next = next;
+  }
+  function openLightbox(srcs, idx){
+    if(!srcs || !srcs.length) return;
+    ensureLightbox();
+    lb.srcs = srcs.slice(); lb.idx = idx || 0;
+    renderLightbox(); lb.el.classList.add('show');
+  }
+  function renderLightbox(){
+    lb.img.src = lb.srcs[lb.idx];
+    var multi = lb.srcs.length > 1;
+    lb.prev.style.display = multi ? '' : 'none';
+    lb.next.style.display = multi ? '' : 'none';
+    lb.count.style.display = multi ? '' : 'none';
+    if(multi) lb.count.textContent = (lb.idx + 1) + ' / ' + lb.srcs.length;
+  }
+  function stepLightbox(d){ if(!lb.srcs.length) return; lb.idx = (lb.idx + d + lb.srcs.length) % lb.srcs.length; renderLightbox(); }
+  function closeLightbox(){ if(lb.el){ lb.el.classList.remove('show'); lb.img.src = ''; } }
+  function lightboxOpen(){ return !!(lb.el && lb.el.classList.contains('show')); }
 
   function todoProgress(note){
     var items = note.items || []; var done = 0;
@@ -744,6 +787,14 @@ export const APP_JS = `
       });
     });
     document.addEventListener('click', function(){ vmenu.classList.remove('open'); });
+
+    // lightbox keyboard: Esc closes, ←/→ navigate
+    document.addEventListener('keydown', function(e){
+      if(!lightboxOpen()) return;
+      if(e.key === 'Escape'){ e.preventDefault(); closeLightbox(); }
+      else if(e.key === 'ArrowLeft'){ e.preventDefault(); stepLightbox(-1); }
+      else if(e.key === 'ArrowRight'){ e.preventDefault(); stepLightbox(1); }
+    });
 
     renderComposerBody(); renderComposerTags(); renderComposerImages(); renderViewMenu();
     load();
