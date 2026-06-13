@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS notes_notes (
   images      TEXT,                                              -- JSON array of {id,url,name} for dropped/uploaded images; NULL if none
   pinned      INTEGER NOT NULL DEFAULT 0,                        -- 0/1
   done        INTEGER NOT NULL DEFAULT 0,                        -- 0/1 (the strike-through "DONE" state)
+  archived    INTEGER NOT NULL DEFAULT 0,                        -- 0/1 (stashed out of the board into the Archive)
+  archived_at INTEGER,                                           -- unix epoch seconds when archived; NULL if not archived
   created_at  INTEGER NOT NULL,                                  -- unix epoch seconds — drives the "May 15 · 9:24 AM" stamp
   updated_at  INTEGER NOT NULL
 );
@@ -30,6 +32,7 @@ CREATE TABLE IF NOT EXISTS notes_notes (
 CREATE INDEX IF NOT EXISTS idx_notes_owner       ON notes_notes(owner_id);
 CREATE INDEX IF NOT EXISTS idx_notes_owner_created ON notes_notes(owner_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_notes_owner_pinned  ON notes_notes(owner_id, pinned);
+CREATE INDEX IF NOT EXISTS idx_notes_owner_archived ON notes_notes(owner_id, archived);
 
 -- ── Tags ───────────────────────────────────────────────────────────────────
 -- First-class, per-user tags. Editing a tag's name updates it everywhere it's

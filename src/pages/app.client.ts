@@ -61,7 +61,7 @@ export const APP_JS = `
   var state = {
     notes: [], tags: [],
     tagById: {}, childMap: {}, topTags: [],
-    filter: null, search: '',
+    filter: null, search: '', archiveView: false,
     composer: { kind:'note', content:'', items:[{text:'',done:false}], images:[], uploading:0, tagIds:{}, editingId:null },
     view: loadView()
   };
@@ -86,6 +86,7 @@ export const APP_JS = `
 
   // ── date helpers ─────────────────────────────────────────
   var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   function formatStamp(sec){
     var d = new Date(sec*1000);
     var h = d.getHours(); var ap = h < 12 ? 'AM' : 'PM'; var hr = h % 12; if(hr === 0) hr = 12;
@@ -260,10 +261,17 @@ export const APP_JS = `
     top.appendChild(leftWrap);
 
     var actions = el('div', { class:'card-actions' });
-    actions.appendChild(el('button', { class:'act' + (note.pinned?' on':''), title:'Pin', onclick: function(e){ e.stopPropagation(); togglePin(note); } }, note.pinned ? '📌' : '📍'));
-    actions.appendChild(el('button', { class:'act', title:'Mark done', onclick: function(e){ e.stopPropagation(); toggleDone(note, card); } }, '✓'));
-    actions.appendChild(el('button', { class:'act', title:'Edit', onclick: function(e){ e.stopPropagation(); editNote(note); } }, '✎'));
-    actions.appendChild(el('button', { class:'act danger', title:'Delete', onclick: function(e){ e.stopPropagation(); deleteNote(note); } }, '🗑'));
+    if(state.archiveView){
+      // Archived cards: restore back to the board, or delete.
+      actions.appendChild(el('button', { class:'act', title:'Restore to board', onclick: function(e){ e.stopPropagation(); toggleArchive(note); } }, '↩'));
+      actions.appendChild(el('button', { class:'act danger', title:'Delete', onclick: function(e){ e.stopPropagation(); deleteNote(note); } }, '🗑'));
+    } else {
+      actions.appendChild(el('button', { class:'act' + (note.pinned?' on':''), title:'Pin', onclick: function(e){ e.stopPropagation(); togglePin(note); } }, note.pinned ? '📌' : '📍'));
+      actions.appendChild(el('button', { class:'act', title:'Mark done', onclick: function(e){ e.stopPropagation(); toggleDone(note, card); } }, '✓'));
+      actions.appendChild(el('button', { class:'act', title:'Archive (save for later)', onclick: function(e){ e.stopPropagation(); toggleArchive(note); } }, '🗄'));
+      actions.appendChild(el('button', { class:'act', title:'Edit', onclick: function(e){ e.stopPropagation(); editNote(note); } }, '✎'));
+      actions.appendChild(el('button', { class:'act danger', title:'Delete', onclick: function(e){ e.stopPropagation(); deleteNote(note); } }, '🗑'));
+    }
     top.appendChild(actions);
     card.appendChild(top);
 
@@ -316,6 +324,7 @@ export const APP_JS = `
 
     // click card background → edit
     card.addEventListener('click', function(e){
+      if(state.archiveView) return;
       if(e.target.closest('a, button, input, label, .media, .embed, .twitter-holder, .linkcard, .note-images')) return;
       editNote(note);
     });
@@ -391,15 +400,43 @@ export const APP_JS = `
   }
   function groupLabelEl(text){ return el('div', { class:'group-label', text:text }); }
 
+  // Archive view: cards grouped by year, then by month within each year.
+  function renderArchiveInto(board, list, cmp){
+    list.sort(cmp);
+    var curY = null, curM = null;
+    list.forEach(function(n){
+      var d = new Date(n.created_at * 1000);
+      var y = d.getFullYear(), m = d.getMonth();
+      if(y !== curY){ board.appendChild(el('div', { class:'year-label', text: String(y) })); curY = y; curM = null; }
+      if(m !== curM){ board.appendChild(groupLabelEl(MONTHS_FULL[m])); curM = m; }
+      board.appendChild(buildCard(n));
+    });
+  }
+
   function renderBoard(){
     var board = qs('board'); board.textContent = '';
-    var list = state.notes.filter(matchesFilter).filter(matchesSearch);
+    var inArchive = state.archiveView;
+    var list = state.notes
+      .filter(function(n){ return inArchive ? n.archived : !n.archived; })
+      .filter(matchesFilter).filter(matchesSearch);
+
     if(!list.length){
-      var msg = state.notes.length ? 'Nothing matches that filter.' : 'No notes yet.';
-      var sub = state.notes.length ? 'Try clearing your search or tag filter.' : 'Type a thought above and hit Save — it becomes a sticky note stamped with today.';
+      var anyArchived = state.notes.some(function(n){ return n.archived; });
+      var msg, sub;
+      if(inArchive){
+        msg = anyArchived ? 'Nothing matches that filter.' : 'Nothing archived yet.';
+        sub = anyArchived ? 'Try clearing your search or tag filter.' : 'Tap 🗄 on any note to save it here for later.';
+      } else {
+        msg = state.notes.length ? 'Nothing matches that filter.' : 'No notes yet.';
+        sub = state.notes.length ? 'Try clearing your search or tag filter.' : 'Type a thought above and hit Save — it becomes a sticky note stamped with today.';
+      }
       board.appendChild(el('div', { class:'empty' }, el('p', { style:'margin:0 0 8px;font-size:16px;', html:'<strong>' + msg + '</strong>' }), el('p', { style:'margin:0;', text: sub })));
       return;
     }
+
+    var cmpA = state.view.oldest ? function(a,b){ return a.created_at - b.created_at; } : function(a,b){ return b.created_at - a.created_at; };
+    if(inArchive){ renderArchiveInto(board, list, cmpA); return; }
+
     var cmp = state.view.oldest ? function(a,b){ return a.created_at - b.created_at; } : function(a,b){ return b.created_at - a.created_at; };
     var pinned = list.filter(function(n){ return n.pinned; }).sort(cmp);
     var rest = list.filter(function(n){ return !n.pinned; }).sort(cmp);
@@ -436,6 +473,18 @@ export const APP_JS = `
   function togglePin(note){
     note.pinned = !note.pinned;
     patchNote(note.id, { pinned: note.pinned }).then(function(){ renderBoard(); });
+  }
+  function toggleArchive(note){
+    note.archived = !note.archived;
+    var msg = note.archived ? 'Archived' : 'Restored to board';
+    patchNote(note.id, { archived: note.archived }).then(function(){ renderBoard(); toast(msg); });
+  }
+  function setArchiveView(on){
+    state.archiveView = on;
+    var comp = qs('composer'); if(comp){ if(on) closeComposer(); comp.style.display = on ? 'none' : ''; }
+    var add = qs('add-note-btn'); if(add) add.style.display = on ? 'none' : '';
+    renderTagBar(); renderBoard();
+    window.scrollTo({ top: 0 });
   }
   function toggleDone(note, card){
     note.done = !note.done;
@@ -587,6 +636,7 @@ export const APP_JS = `
   // ── tag bar + editor ─────────────────────────────────────
   function renderTagBar(){
     var bar = qs('tagbar'); bar.textContent = '';
+    bar.appendChild(el('button', { class:'chip ' + (state.archiveView ? 'archive-on' : 'ghost'), onclick: function(){ setArchiveView(!state.archiveView); } }, state.archiveView ? '← Back to notes' : '🗄 Archive'));
     bar.appendChild(el('button', { class:'chip ghost', onclick: openTagEditor }, '+ Add Tag'));
     bar.appendChild(el('button', { class:'chip ghost', onclick: openTagEditor }, '# Edit Tags'));
     state.topTags.forEach(function(t){

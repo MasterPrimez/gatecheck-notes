@@ -232,6 +232,12 @@ const STYLES = `
     margin: 26px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border-faint);
   }
   .group-label:first-child { margin-top: 0; }
+  .year-label {
+    column-span: all; -webkit-column-span: all; color: var(--text);
+    font-size: 24px; font-weight: 700; letter-spacing: -0.01em; margin: 32px 0 4px;
+  }
+  .year-label:first-child { margin-top: 0; }
+  .chip.archive-on { color: var(--gold); border-color: var(--gold-border); background: var(--gold-glow); }
 
   .note-card {
     break-inside: avoid; -webkit-column-break-inside: avoid;

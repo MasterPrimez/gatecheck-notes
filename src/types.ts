@@ -42,6 +42,8 @@ export interface NoteRow {
   images: string | null;
   pinned: number; // 0/1
   done: number; // 0/1
+  archived: number; // 0/1
+  archived_at: number | null;
   created_at: number;
   updated_at: number;
 }
@@ -55,6 +57,8 @@ export interface NoteDTO {
   images: NoteImage[];
   pinned: boolean;
   done: boolean;
+  archived: boolean;
+  archived_at: number | null;
   created_at: number;
   updated_at: number;
   tag_ids: string[];

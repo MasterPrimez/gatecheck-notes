@@ -67,6 +67,8 @@ function toDTO(row: NoteRow, tagIds: string[]): NoteDTO {
     images: parseImages(row.images),
     pinned: !!row.pinned,
     done: !!row.done,
+    archived: !!row.archived,
+    archived_at: row.archived_at ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
     tag_ids: tagIds,
@@ -254,6 +256,8 @@ app.post("/", async (c) => {
     images: imagesJson,
     pinned: body.pinned ? 1 : 0,
     done: body.done ? 1 : 0,
+    archived: 0,
+    archived_at: null,
     created_at: ts,
     updated_at: ts,
   };
@@ -288,6 +292,7 @@ app.put("/:id", async (c) => {
     tag_ids?: string[];
     pinned?: boolean;
     done?: boolean;
+    archived?: boolean;
   };
   try {
     body = await c.req.json();
@@ -335,6 +340,12 @@ app.put("/:id", async (c) => {
   if (body.done !== undefined) {
     updates.push("done = ?");
     values.push(body.done ? 1 : 0);
+  }
+  if (body.archived !== undefined) {
+    updates.push("archived = ?");
+    values.push(body.archived ? 1 : 0);
+    updates.push("archived_at = ?");
+    values.push(body.archived ? now() : null);
   }
 
   if (updates.length > 0) {
